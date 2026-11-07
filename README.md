@@ -1,23 +1,74 @@
 # pgscratch
 
-Throwaway PostgreSQL clusters for Go tests, with no Docker and no database you
-start by hand. pgscratch finds the server binaries already on the machine, runs
-`initdb` into a scratch directory, starts the server tuned for speed, hands each
-test its own database, and removes everything when the process exits, however
-it exits.
+Give every Go test its own real, throwaway PostgreSQL database: ready in a few
+dozen milliseconds, already holding your schema and test data, and deleted
+afterwards. No Docker, and nothing to set up by hand.
 
 ```go
 import "github.com/jadeandernie/pgscratch"
 ```
 
-The core is standard library only: the package speaks just enough of the
-PostgreSQL wire protocol (simple query and COPY, trust auth) to manage
-databases and seed templates. Tests open their own connections with whatever
-driver they use (`pgx`, `database/sql`, ...) through the DSNs it returns.
+## The problem
 
-Supported on Linux, macOS and the BSDs. Needs PostgreSQL 9.6 or newer (tested with 15 and 18)
-server binaries (`initdb`, `pg_ctl`, `postgres`); seeding from dumps also needs
-`pg_restore` and `psql`.
+If your code talks to PostgreSQL, the honest way to test it is against a real
+PostgreSQL. Getting one for tests is where it goes wrong. The usual choices
+each cost something:
+
+- **One shared test database.** Tests see each other's rows, so one test's
+  leftovers break another. They can't safely run at the same time, so the
+  suite is slow. Someone has to install it, start it and keep it clean.
+- **A database in Docker** (testcontainers and the like). It works, but every
+  laptop and CI runner needs Docker, each container takes seconds to start,
+  and it is one more thing that can break.
+- **A stand-in instead of Postgres** (an in-memory fake, SQLite, mocks). Fast,
+  but it isn't Postgres. Triggers, stored functions, extensions, JSON
+  operators, locking and plenty of ordinary SQL behave differently or not at
+  all, so the bugs you most need to catch slip through.
+- **Skipping database tests on laptops** and leaving them to CI. A developer
+  then learns a query is broken only after pushing, and waits on CI again for
+  every attempt at a fix.
+
+All of them share one more cost: before a test can run, its database needs
+your schema (the migrations) and some test data. Doing that from scratch for
+every test is slow, often slower than the test itself.
+
+## What pgscratch does
+
+Most developer machines and CI images already have PostgreSQL installed, even
+when it isn't running. pgscratch uses that copy:
+
+1. **The first test that asks starts a private Postgres server** for this test
+   run, in a temporary directory, on a random port that only this machine can
+   reach. It is tuned for speed over durability, since nothing in it needs to
+   survive.
+2. **Every test gets its own database on that server.** Tests can run in
+   parallel (`t.Parallel()`), never see each other's data, and never wait on
+   one another.
+3. **Your schema and test data are built once, not once per test.** You list
+   the setup steps (migrations, SQL files, CSV files, a database dump);
+   pgscratch runs them once into a *template* database, and each test gets a
+   copy. Postgres copies a database by copying its files, which is far faster
+   than replaying the setup. If the setup hasn't changed, the template is
+   reused rather than rebuilt.
+4. **When the tests finish, everything is deleted:** the databases, the server
+   and its directory. That holds even if the test process crashes, times out
+   or is killed.
+
+If PostgreSQL isn't installed, tests can skip with a clear message instead of
+failing.
+
+### Is it for me?
+
+Use it when you write Go tests for code that uses PostgreSQL and want them to
+run against the real thing, quickly, on laptops and in CI alike.
+
+It is not for running Postgres in production or for holding data you want to
+keep; see [Security](#security). It needs the PostgreSQL server programs on
+the machine (version 9.6 or newer; tested with 15 and 18), which are one
+package install away (`brew install postgresql@17`, `apt install postgresql`).
+It runs on Linux, macOS and the BSDs, not Windows. The library itself has no
+dependencies outside Go's standard library; your tests connect with whatever
+driver they already use (`pgx`, `database/sql`, ...).
 
 ## Usage
 

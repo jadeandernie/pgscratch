@@ -5,6 +5,11 @@ All notable changes to pgscratch are listed here. The project follows
 
 ## Unreleased
 
+## v1.0.1 (2026-11-07)
+
+- README: a plain-language account of the problem pgscratch solves, what it
+  does step by step, and who it is for. No code changes.
+
 ## v1.0.0 (2026-11-07)
 
 - First stable release. The API in v0.1.0 is unchanged.
