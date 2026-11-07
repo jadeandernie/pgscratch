@@ -189,6 +189,16 @@ clusters. If `initdb` fails with "could not create semaphores", raise them:
 sudo sysctl -w kern.sysv.semmni=256 kern.sysv.semmns=4096 kern.sysv.semmsl=87
 ```
 
+## Security
+
+A pgscratch cluster is for tests only. It uses `trust` authentication, with no
+password, on its unix socket (in a directory only the current user can open)
+and on a random `127.0.0.1` port. While it runs, any local process that can
+reach that port can connect as the superuser. Do not put real data in it, and
+do not run it on a machine shared with users you do not trust. `fsync` is off,
+so a crash can lose or corrupt the cluster; pgscratch deletes it afterwards
+anyway.
+
 ## Benchmark
 
 `go test -run '^$' -bench . -benchtime 3s` on an Apple M3 Pro (12 cores),
