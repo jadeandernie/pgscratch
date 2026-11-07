@@ -1,0 +1,69 @@
+---
+name: Go
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: "12 2 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  test-linux:
+    name: Test Go ${{ matrix.go }}, PostgreSQL ${{ matrix.pg }} on Linux
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.23.x", "stable"]
+        pg: ["15", "17"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Install PostgreSQL ${{ matrix.pg }}
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-${{ matrix.pg }}
+          sudo systemctl stop postgresql || true
+      - name: Test
+        env:
+          PGSCRATCH_TEST_MAJOR: ${{ matrix.pg }}
+        run: go test -race ./...
+      - name: Check formatting
+        run: |
+          gofmt -s -w .
+          git diff --exit-code
+
+  test-macos:
+    name: Test Go stable, PostgreSQL 15 on macOS
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Install PostgreSQL 15
+        run: brew install postgresql@15
+      - name: Test
+        env:
+          PGSCRATCH_TEST_MAJOR: "15"
+        run: go test -race ./...
+
+  build-other:
+    name: Build for ${{ matrix.goos }}
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        goos: [windows, freebsd]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - run: GOOS=${{ matrix.goos }} go vet ./...

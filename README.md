@@ -229,6 +229,13 @@ time under `-race`, every step kind, derived templates, the persistent cache's
 hit and miss, and two processes holding clusters at once (own and shared) to
 show neither waits on the other.
 
+## Contributing
+
+Contributions are welcome, from people and from AI coding agents alike. Raise a
+pull request against `main`; there is no need to open an issue first. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the checks to run and what a pull
+request should include.
+
 ## License
 
 MIT
